@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>My first three.js app</title>
+    <style>
+        body {
+            margin: 0 ;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+    </div>
+    <button id="button">Adjust brightness</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.8.0/gsap.min.js"></script>
+    <script type="module">
+    import * as THREE from ' https://cdn.skypack.dev/pin/three@v0.133.1-nP52U8LARkTRhxRcba9x/mode=imports/optimized/three.js';
+    import vertexShader from './shaders/vertex.glsl.js';
+    import fragmentShader from './shaders/fragment.glsl.js';
+    import atmosphereVertexShader from './shaders/atmosphereVertex.glsl.js';
+    import atmosphereFragmentShader from './shaders/atmosphereFragment.glsl.js';
+
+
+
+    const scene = new THREE.Scene();
+
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            const resolution = new THREE.Vector2(window.innerWidth, window.innerHeight);
+
+            let color1 = 0.7;
+            let color2= 0.2;
+            let color3 = 0;
+            let delta = 0
+
+
+            const $button = document.getElementById("button");
+
+            const onButtonClick = (e) => {
+                color1 = Math.floor(Math.random() * 10) / 10;
+                color2 = Math.floor(Math.random() * 10) / 10;
+                color3 = Math.floor(Math.random() * 10) / 10;
+            }
+
+            $button.addEventListener("click", onButtonClick);
+
+            let analyser, uniforms;
+
+            camera.position.z = 15;
+
+            const renderer = new THREE.WebGLRenderer({
+                            antialias: true
+                    });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            const handleClicked = () => {
+                const fftSize = 128;
+
+                const listener = new THREE.AudioListener();
+                const audio = new THREE.Audio(listener);
+                const file = './image/music.mp3';
+
+                if (/(iPad|iPhone|iPod)/g.test(navigator.userAgent)) {
+
+                    const loader = new THREE.AudioLoader();
+                    loader.load(file, function (buffer) {
+                        audio.setBuffer(buffer);
+                        audio.play();
+
+                    });
+
+                } else {
+
+                    const mediaElement = new Audio(file);
+                    mediaElement.play();
+
+                    audio.setMediaElementSource(mediaElement);
+
+                }
+
+                analyser = new THREE.AudioAnalyser(audio, fftSize);
+
+                const format = (renderer.capabilities.isWebGL2) ? THREE.RedFormat : THREE.LuminanceFormat;
+
+
+            }
+
+
+            const videoElement = document.createElement('video');
+
+            videoElement.setAttribute('autoPlay', '');
+
+            videoElement.setAttribute('muted', '');
+
+            videoElement.setAttribute('controls', '');
+
+            videoElement.setAttribute('playsInline', '');
+
+            videoElement.setAttribute('width', 320);
+
+            videoElement.setAttribute('height', 240);
+            
+            videoElement.setAttribute('loop', '');
+            
+            navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                    .then(function (stream) {
+                        videoElement.srcObject = stream;
+                        videoElement.play();
+                    })
+                    .catch(function (err) {
+                        console.log("An error occured! " + err);
+                    });
+            
+
+            const videoTexture = new THREE.VideoTexture(videoElement)
+
+
+            
+            
+            //create a sphere
+            const shaderMaterial = new THREE.ShaderMaterial({
+                    vertexShader,
+                    fragmentShader,
+                    // side: THREE.BackSide,
+                    uniforms: {
+                        iColor: { value: color1, color2, color3 },
+                        iResolution: { type: 'v2', value: resolution },
+                        iChannel0: { value: new THREE.TextureLoader().load('./image/texture.jpeg') },
+                        iChannel1: { value: videoTexture },
+                        iTime: { type: 'f', value: 0.1 }
+                    }
+                });
+            const geometry = new THREE.SphereGeometry(5, 50, 50);
+            const sphere = new THREE.Mesh(geometry, shaderMaterial);
+            scene.add(sphere);
+
+
+            //create a sphere
+            const shaderMaterialTwo = new THREE.ShaderMaterial({
+                    vertexShader,
+                    fragmentShader,
+                    // side: THREE.BackSide,
+                    uniforms: {
+                        iColor: { value: color1, color2, color3 },
+                        iResolution: { type: 'v2', value: resolution },
+                        iChannel0: { value: new THREE.TextureLoader().load('./image/texture.jpeg') },
+                        iChannel1: { value: videoTexture },
+                        iTime: { type: 'f', value: 0.1 }
+                    }
+                });
+            const geometryTwo = new THREE.SphereGeometry(3, 50, 40)
+            const sphereTwo = new THREE.Mesh( geometryTwo, shaderMaterialTwo);
+             sphereTwo.position.x = 10;
+                    scene.add(sphereTwo);
+
+
+
+            //create an atmosphere
+            const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(5, 50, 50), new THREE.ShaderMaterial({
+                vertexShader: atmosphereVertexShader,
+                fragmentShader: atmosphereFragmentShader,
+                side: THREE.BackSide
+                }))
+            
+            atmosphere.scale.set (1.2, 1.2, 1.2);
+
+            scene.add(atmosphere);
+
+            const mouse = {
+                x: undefined,
+                y: undefined
+            }
+
+            const pos  = {
+                x: 15,
+                y: undefined
+            }
+
+            const group = new THREE.Group();
+            group.add(sphere);
+            scene.add(group);
+            
+
+            function animate() {
+                    requestAnimationFrame(animate);
+                   /* sphere.material.uniforms.iChannel1.value = videoTexture;
+                    sphere.material.needsUpdate = true;*/
+                    renderer.render(scene, camera);
+                    sphere.rotation.y += 0.0001;
+                        group.rotation.y = mouse.x * 0.5;
+                        gsap.to(group.rotation, {
+                        x: -mouse.y * 0.5,
+                        y: mouse.x * 0.5,
+                        duration: 2 
+                        })
+                    sphereTwo.position.x = pos.x;
+                    gsap.to(sphereTwo.position, {
+                        x: pos.x * 0.5,
+                        duration: 2
+                    })
+                     group.position.x = -pos.x;
+                        gsap.to(group.position, {
+                        x: -pos.x * 0.5,
+                        duration: 2
+                    })
+                      atmosphere.position.x = -pos.x;
+                        gsap.to(atmosphere.position, {
+                        x: -pos.x * 0.5,
+                        duration: 2
+                    })
+
+                    delta += 0.1;
+
+                    // Update uniform in Shader Material
+                    shaderMaterial.uniforms.iColor.value =  color1, color2, color3;
+                    shaderMaterialTwo.uniforms.iColor.value = color1, color2, color3;
+
+
+                }
+
+            animate();
+
+           addEventListener('mousemove', () => {
+                mouse.x = (event.clientX / innerWidth) * 2 - 1;
+                mouse.y = (event.clientY / innerHeight) * 2 + 1;
+            });
+
+            addEventListener('scroll', () => {
+                if ((15 - window.scrollY) > 0 ) {
+                    pos.x = 15 - window.scrollY;
+                }
+                console.log(window.scrollY)
+            })
+
+
+    </script>
+</body>
+
+</html>
